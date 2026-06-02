@@ -4,4 +4,4 @@
 
 ## 使用方式
 
-直接開啟 `index.html` 即可操作。
+直接開啟 `PID_Adj/index.html` 即可操作。
