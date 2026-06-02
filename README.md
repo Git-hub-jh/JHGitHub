@@ -1,4 +1,7 @@
-# JHGitHub
+# PID 控制互動演示
 
-This repository is prepared for connecting local Codex work with GitHub.
+一個可調整 P、I、D 參數的 PID 控制視覺化網頁。
 
+## 使用方式
+
+直接開啟 `index.html` 即可操作。

@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PID 控制互動演示</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #647085;
+      --line: #dbe2ef;
+      --blue: #246bfe;
+      --green: #0f9f6e;
+      --red: #db3a34;
+      --amber: #c88400;
+      --shadow: 0 16px 40px rgba(23, 32, 51, 0.1);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(36, 107, 254, 0.08), transparent 340px),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(310px, 380px) minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .sidebar,
+    .main {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(219, 226, 239, 0.9);
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+    }
+
+    .sidebar {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .main {
+      padding: 18px;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto minmax(300px, 1fr) auto;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.55rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 18px;
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+
+    .group {
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+
+    .group:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .group-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-weight: 750;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .preset {
+      border: 1px solid var(--line);
+      background: #f9fbff;
+      border-radius: 8px;
+      min-height: 42px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    .preset:hover,
+    .preset.active {
+      border-color: var(--blue);
+      background: #eef4ff;
+    }
+
+    .control {
+      display: grid;
+      grid-template-columns: 1fr 82px;
+      gap: 8px 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .control label {
+      font-weight: 700;
+      font-size: 0.94rem;
+    }
+
+    .control input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 8px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .control input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      margin: 4px 0 0;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(110px, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcff;
+      min-width: 0;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-bottom: 4px;
+    }
+
+    .stat strong {
+      font-size: 1.05rem;
+      overflow-wrap: anywhere;
+    }
+
+    .chart-wrap {
+      position: relative;
+      min-height: 300px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 300px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 4px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .note {
+      border-left: 4px solid var(--line);
+      padding: 6px 10px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.9rem;
+    }
+
+    .note strong {
+      color: var(--ink);
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        padding: 10px;
+      }
+
+      .stats,
+      .notes {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .stats,
+      .notes,
+      .preset-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar,
+      .main {
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>PID 控制互動演示</h1>
+      <p class="subtitle">調整參數後，右側曲線會即時更新。模型假設控制一個具有慣性與阻尼的系統，例如馬達速度或溫控反應。</p>
+
+      <section class="group">
+        <div class="group-title">常見情境</div>
+        <div class="preset-grid" id="presets"></div>
+      </section>
+
+      <section class="group">
+        <div class="group-title">PID 參數</div>
+        <div id="pidControls"></div>
+        <p class="hint">P 讓反應變快，I 消除長期誤差，D 抑制震盪。三者過高都可能讓系統不穩。</p>
+      </section>
+
+      <section class="group">
+        <div class="group-title">系統與目標</div>
+        <div id="systemControls"></div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1>即時響應曲線</h1>
+          <p class="subtitle">比較輸出是否快速、平穩地抵達目標值。</p>
+        </div>
+        <div class="legend">
+          <span class="legend-item" style="color: var(--blue)"><i class="swatch"></i>系統輸出</span>
+          <span class="legend-item" style="color: var(--green)"><i class="swatch"></i>目標值</span>
+          <span class="legend-item" style="color: var(--red)"><i class="swatch"></i>誤差</span>
+          <span class="legend-item" style="color: var(--amber)"><i class="swatch"></i>控制輸出</span>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="chart" width="1200" height="620" aria-label="PID 控制響應曲線"></canvas>
+      </div>
+
+      <section class="stats" id="stats"></section>
+
+      <section class="notes">
+        <div class="note"><strong>P：</strong>提高後通常更快接近目標，但太高容易超越目標並震盪。</div>
+        <div class="note"><strong>I：</strong>會累積誤差來消除偏差，但太高會造成過衝與慢性震盪。</div>
+        <div class="note"><strong>D：</strong>會對變化率煞車，常用來降低過衝，但太高會讓反應變鈍。</div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      kp: 7.2,
+      ki: 1.1,
+      kd: 2.4,
+      setpoint: 1,
+      damping: 0.75,
+      inertia: 1,
+      disturbance: 0.18,
+      duration: 12,
+    };
+
+    const controls = [
+      { key: "kp", label: "Kp 比例", min: 0, max: 18, step: 0.1 },
+      { key: "ki", label: "Ki 積分", min: 0, max: 6, step: 0.05 },
+      { key: "kd", label: "Kd 微分", min: 0, max: 8, step: 0.05 },
+    ];
+
+    const systemControls = [
+      { key: "setpoint", label: "目標值", min: 0.2, max: 2, step: 0.05 },
+      { key: "damping", label: "系統阻尼", min: 0.1, max: 2.5, step: 0.05 },
+      { key: "inertia", label: "系統慣性", min: 0.25, max: 3, step: 0.05 },
+      { key: "disturbance", label: "外部干擾", min: 0, max: 0.6, step: 0.02 },
+      { key: "duration", label: "模擬秒數", min: 4, max: 24, step: 1 },
+    ];
+
+    const presets = [
+      { name: "穩定平衡", values: { kp: 7.2, ki: 1.1, kd: 2.4 } },
+      { name: "只有 P", values: { kp: 6.8, ki: 0, kd: 0 } },
+      { name: "P 太高", values: { kp: 15.5, ki: 0.4, kd: 0.2 } },
+      { name: "I 太高", values: { kp: 5.4, ki: 5.1, kd: 0.7 } },
+      { name: "加 D 抑震", values: { kp: 12, ki: 0.7, kd: 4.6 } },
+      { name: "反應柔和", values: { kp: 3.4, ki: 0.45, kd: 1.6 } },
+    ];
+
+    const pidRoot = document.querySelector("#pidControls");
+    const systemRoot = document.querySelector("#systemControls");
+    const presetRoot = document.querySelector("#presets");
+    const statsRoot = document.querySelector("#stats");
+    const canvas = document.querySelector("#chart");
+    const ctx = canvas.getContext("2d");
+
+    function formatValue(value) {
+      return Number(value).toFixed(Number(value) >= 10 ? 1 : 2);
+    }
+
+    function createControl(def, root) {
+      const row = document.createElement("div");
+      row.className = "control";
+
+      const label = document.createElement("label");
+      label.htmlFor = `${def.key}-range`;
+      label.textContent = def.label;
+
+      const number = document.createElement("input");
+      number.type = "number";
+      number.min = def.min;
+      number.max = def.max;
+      number.step = def.step;
+      number.value = state[def.key];
+      number.id = `${def.key}-number`;
+
+      const range = document.createElement("input");
+      range.type = "range";
+      range.min = def.min;
+      range.max = def.max;
+      range.step = def.step;
+      range.value = state[def.key];
+      range.id = `${def.key}-range`;
+
+      function update(value) {
+        const bounded = Math.min(def.max, Math.max(def.min, Number(value)));
+        state[def.key] = bounded;
+        number.value = bounded;
+        range.value = bounded;
+        setActivePreset();
+        render();
+      }
+
+      number.addEventListener("input", () => update(number.value));
+      range.addEventListener("input", () => update(range.value));
+
+      row.append(label, number, range);
+      root.append(row);
+    }
+
+    function createPresets() {
+      presets.forEach((preset) => {
+        const button = document.createElement("button");
+        button.className = "preset";
+        button.type = "button";
+        button.textContent = preset.name;
+        button.addEventListener("click", () => {
+          Object.assign(state, preset.values);
+          syncInputs();
+          setActivePreset();
+          render();
+        });
+        presetRoot.append(button);
+      });
+    }
+
+    function syncInputs() {
+      [...controls, ...systemControls].forEach((def) => {
+        document.querySelector(`#${def.key}-number`).value = state[def.key];
+        document.querySelector(`#${def.key}-range`).value = state[def.key];
+      });
+    }
+
+    function setActivePreset() {
+      const buttons = [...presetRoot.children];
+      buttons.forEach((button, index) => {
+        const values = presets[index].values;
+        const matched = Object.entries(values).every(([key, value]) => Math.abs(state[key] - value) < 0.001);
+        button.classList.toggle("active", matched);
+      });
+    }
+
+    function simulate() {
+      const dt = 0.01;
+      const steps = Math.floor(state.duration / dt);
+      let y = 0;
+      let velocity = 0;
+      let integral = 0;
+      let previousError = state.setpoint;
+      let peak = -Infinity;
+      let settledAt = null;
+      let errorArea = 0;
+      const points = [];
+
+      for (let i = 0; i <= steps; i += 1) {
+        const t = i * dt;
+        const target = t < 0.35 ? 0 : state.setpoint;
+        const error = target - y;
+        integral = Math.max(-8, Math.min(8, integral + error * dt));
+        const derivative = (error - previousError) / dt;
+        const control = state.kp * error + state.ki * integral + state.kd * derivative;
+        const limitedControl = Math.max(-18, Math.min(18, control));
+        const disturbance = t > state.duration * 0.52 ? state.disturbance : 0;
+
+        const acceleration = (limitedControl - state.damping * velocity - y - disturbance) / state.inertia;
+        velocity += acceleration * dt;
+        y += velocity * dt;
+        previousError = error;
+        peak = Math.max(peak, y);
+        errorArea += Math.abs(error) * dt;
+
+        if (t > 0.6 && Math.abs(error) <= Math.max(0.025, state.setpoint * 0.03) && Math.abs(velocity) < 0.08) {
+          if (settledAt === null) settledAt = t;
+        } else if (t > 0.6) {
+          settledAt = null;
+        }
+
+        if (i % 3 === 0) {
+          points.push({ t, y, target, error, control: limitedControl });
+        }
+      }
+
+      const final = points[points.length - 1];
+      const overshoot = Math.max(0, ((peak - state.setpoint) / Math.max(0.001, state.setpoint)) * 100);
+      return {
+        points,
+        metrics: {
+          finalError: final.error,
+          overshoot,
+          settledAt,
+          errorArea,
+        },
+      };
+    }
+
+    function drawGrid(bounds, scales) {
+      const { left, top, width, height } = bounds;
+      ctx.strokeStyle = "#edf1f7";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "#647085";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+
+      for (let i = 0; i <= 6; i += 1) {
+        const y = top + (height * i) / 6;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + width, y);
+        ctx.stroke();
+
+        const value = scales.maxY - ((scales.maxY - scales.minY) * i) / 6;
+        ctx.fillText(value.toFixed(1), left - 8, y);
+      }
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let i = 0; i <= 6; i += 1) {
+        const x = left + (width * i) / 6;
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, top + height);
+        ctx.stroke();
+        ctx.fillText(((state.duration * i) / 6).toFixed(0) + "s", x, top + height + 8);
+      }
+    }
+
+    function drawLine(points, bounds, scales, key, color, width = 2.5) {
+      const { left, top, height } = bounds;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const x = left + (point.t / state.duration) * bounds.width;
+        const y = top + ((scales.maxY - point[key]) / (scales.maxY - scales.minY)) * height;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    function renderChart(result) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(700, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(360, Math.floor(rect.height * ratio));
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+      const width = canvas.width / ratio;
+      const height = canvas.height / ratio;
+      ctx.clearRect(0, 0, width, height);
+
+      const bounds = {
+        left: 54,
+        top: 22,
+        width: width - 78,
+        height: height - 58,
+      };
+
+      const values = result.points.flatMap((p) => [p.y, p.target, p.error, p.control / 8]);
+      const minY = Math.min(-0.4, ...values) - 0.15;
+      const maxY = Math.max(1.2, state.setpoint + 0.4, ...values) + 0.15;
+      const scales = { minY, maxY };
+
+      drawGrid(bounds, scales);
+      drawLine(result.points, bounds, scales, "target", "#0f9f6e", 2);
+      drawLine(result.points, bounds, scales, "error", "#db3a34", 1.8);
+      drawLine(result.points.map((p) => ({ ...p, control: p.control / 8 })), bounds, scales, "control", "#c88400", 1.7);
+      drawLine(result.points, bounds, scales, "y", "#246bfe", 3);
+
+      ctx.fillStyle = "#172033";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("控制輸出以 1/8 比例繪製，方便與輸出曲線同圖比較", bounds.left + 8, bounds.top + 8);
+    }
+
+    function renderStats(metrics) {
+      const rows = [
+        ["穩態誤差", formatValue(metrics.finalError)],
+        ["最大過衝", `${metrics.overshoot.toFixed(1)}%`],
+        ["整定時間", metrics.settledAt ? `${metrics.settledAt.toFixed(2)}s` : "未穩定"],
+        ["累積誤差", metrics.errorArea.toFixed(2)],
+      ];
+      statsRoot.innerHTML = rows.map(([label, value]) => (
+        `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`
+      )).join("");
+    }
+
+    function render() {
+      const result = simulate();
+      renderChart(result);
+      renderStats(result.metrics);
+    }
+
+    controls.forEach((def) => createControl(def, pidRoot));
+    systemControls.forEach((def) => createControl(def, systemRoot));
+    createPresets();
+    setActivePreset();
+    render();
+    window.addEventListener("resize", render);
+  </script>
+</body>
+</html>
